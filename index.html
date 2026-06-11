@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Cuts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mat: #15584d;
+    --mat-dark: #0f463d;
+    --mat-line: rgba(220,255,245,.10);
+    --tick: #9fd3c6;
+    --paper: #f4efe2;
+    --paper-line: #d9d2bf;
+    --paper-edge: #cdc4ab;
+    --blade: #e8503a;
+    --ink: #16201d;
+    --p1: #e08a3c;
+    --p2: #3f8fd8;
+    --panel: #103f37;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #1c6b5e, #0c3a32 70%);
+    color: #eafaf4; min-height: 100vh; padding: 24px 16px 60px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .mono { font-family: 'Space Mono', monospace; }
+
+  header { text-align: center; margin-bottom: 18px; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -1px; }
+  h1 .blade-dot { color: var(--blade); }
+  header p { color: var(--tick); font-size: 14px; margin-top: 4px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+  }
+  .controls label { font-size: 12px; color: var(--tick); text-transform: uppercase; letter-spacing: .06em; }
+  .controls select {
+    font-family: 'Space Mono', monospace; font-size: 14px;
+    background: #0c322c; color: #eafaf4; border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px; padding: 7px 10px; cursor: pointer;
+  }
+  .controls button {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+    background: var(--blade); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 16px; cursor: pointer; transition: filter .15s, transform .08s;
+  }
+  .controls button:hover { filter: brightness(1.08); }
+  .controls button:active { transform: translateY(1px); }
+
+  .status {
+    display: flex; gap: 18px; align-items: center; justify-content: center;
+    margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .turn-badge {
+    display: flex; align-items: center; gap: 9px;
+    background: var(--panel); border-radius: 30px; padding: 8px 16px 8px 10px;
+    border: 2px solid transparent; font-weight: 600; font-size: 15px;
+  }
+  .turn-badge .chip { width: 22px; height: 22px; border-radius: 50%; }
+  .turn-badge.p1 { border-color: var(--p1); } .turn-badge.p1 .chip { background: var(--p1); }
+  .turn-badge.p2 { border-color: var(--p2); } .turn-badge.p2 .chip { background: var(--p2); }
+  .stat { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--tick); }
+  .stat b { color: #eafaf4; font-size: 16px; }
+  .progress { width: 140px; height: 6px; background: #0c322c; border-radius: 4px; overflow: hidden; }
+  .progress span { display: block; height: 100%; background: var(--blade); width: 0; transition: width .3s; }
+
+  .mat {
+    position: relative;
+    background: var(--mat);
+    background-image:
+      repeating-linear-gradient(to right, var(--mat-line) 0 1px, transparent 1px var(--cell, 54px)),
+      repeating-linear-gradient(to bottom, var(--mat-line) 0 1px, transparent 1px var(--cell, 54px));
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.05);
+    padding: 34px;
+  }
+  .ruler-top, .ruler-left { position: absolute; color: var(--tick); font-size: 11px; font-family: 'Space Mono', monospace; }
+  .ruler-top { top: 12px; left: 34px; height: 18px; }
+  .ruler-left { left: 12px; top: 34px; width: 18px; }
+  .ruler-top .num, .ruler-left .num { position: absolute; transform: translate(-50%,0); }
+  .ruler-left .num { transform: translate(0,-50%); }
+
+  .paper { position: relative; }
+
+  .piece {
+    position: absolute;
+    background-color: var(--paper);
+    border-radius: 2px;
+    box-shadow: 0 2px 5px rgba(0,0,0,.28), 0 8px 16px rgba(0,0,0,.16);
+    transition: box-shadow .15s, transform .15s;
+    animation: drop .22s ease;
+  }
+  @keyframes drop { from { transform: scale(.94); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+  .piece.unit { box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+
+  .hotspot { position: absolute; cursor: crosshair; z-index: 1; }
+  .hotspot.v { width: 14px; transform: translateX(-50%); z-index: 2; }
+  .hotspot.h { height: 14px; transform: translateY(-50%); }
+  .hotspot::before {
+    content: ""; position: absolute; background: var(--blade);
+    opacity: 0; transition: opacity .12s; border-radius: 2px;
+  }
+  .hotspot.v::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+  .hotspot.h::before { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+  .hotspot:hover::before { opacity: 1; box-shadow: 0 0 6px var(--blade); }
+
+  .winner {
+    margin-top: 22px; min-height: 30px; text-align: center;
+    font-size: 20px; font-weight: 700;
+  }
+  .winner .again {
+    display: inline-block; margin-left: 10px; font-size: 13px; font-weight: 600;
+    background: var(--blade); color: #fff; border: none; border-radius: 7px;
+    padding: 7px 13px; cursor: pointer; vertical-align: middle;
+  }
+
+  details {
+    margin-top: 24px; max-width: 520px; width: 100%;
+    background: var(--panel); border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+  }
+  summary { cursor: pointer; padding: 12px 16px; font-weight: 600; font-size: 14px; }
+  details p, details li { font-size: 13px; color: #cfe8e0; line-height: 1.55; }
+  details .body { padding: 0 16px 14px; }
+  details ul { margin: 6px 0 0 18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Paper&nbsp;Cuts<span class="blade-dot">.</span></h1>
+  <p>Take turns slicing the sheet. The player who makes the last cut wins.</p>
+</header>
+
+<div class="controls">
+  <label for="cols">Cols</label>
+  <select id="cols"></select>
+  <label for="rows">Rows</label>
+  <select id="rows"></select>
+  <label for="pre">Pre-cuts</label>
+  <select id="pre"></select>
+  <button onclick="newGame()">New game</button>
+</div>
+
+<div class="status">
+  <div class="turn-badge p1" id="turnBadge"><span class="chip"></span><span id="turnText">Player 1 to cut</span></div>
+  <div class="stat">Cuts made <b id="moveCount">0</b></div>
+  <div class="stat">Pieces <b id="pieceCount">1</b></div>
+  <div class="progress"><span id="progressBar"></span></div>
+</div>
+
+<div class="mat" id="mat">
+  <div class="ruler-top" id="rulerTop"></div>
+  <div class="ruler-left" id="rulerLeft"></div>
+  <div class="paper" id="paper"></div>
+</div>
+
+<div class="winner" id="winner"></div>
+
+<details>
+  <summary>How to play</summary>
+  <div class="body">
+    <p>The sheet is a grid of unit squares. On your turn, hover near any internal grid line inside a piece — a red blade guide appears — and click to cut all the way across that piece, splitting it in two.</p>
+    <ul>
+      <li>You can only cut along internal lines, never the outer border.</li>
+      <li>Every cut splits exactly one region into two, so every offered cut is valid.</li>
+      <li>The game ends when every piece is a 1×1 square. Whoever made the final cut wins.</li>
+      <li>"Pre-cuts" starts the sheet with some cuts already made, as the rules allow.</li>
+    </ul>
+  </div>
+</details>
+
+<script>
+/* =========================================================
+   PAPER CUTS — a two-player paper-cutting game
+   GAME STATE: the sheet is a list of rectangular "regions".
+   A region covers columns [c0, c1) and rows [r0, r1).
+   A region is fully reduced when its width and height are both 1.
+   A MOVE: split one region along an internal grid line into two.
+   WIN/LOSS: the game ends only when every region is 1x1.
+   ========================================================= */
+
+const GAP = 3;
+let state = null;
+let cell = 54;
+
+function fillSelect(id, from, to, def) {
+  const sel = document.getElementById(id);
+  for (let i = from; i <= to; i++) {
+    const o = document.createElement("option");
+    o.value = i; o.textContent = i;
+    if (i === def) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+fillSelect("cols", 2, 7, 5);
+fillSelect("rows", 2, 7, 4);
+fillSelect("pre", 0, 6, 0);
+
+function newGame() {
+  const cols = +document.getElementById("cols").value;
+  const rows = +document.getElementById("rows").value;
+  const pre = +document.getElementById("pre").value;
+
+  cell = Math.max(34, Math.min(60, Math.floor(560 / cols), Math.floor(420 / rows)));
+
+  state = {
+    cols, rows,
+    regions: [ { id: 1, c0: 0, r0: 0, c1: cols, r1: rows } ],
+    nextId: 2,
+    turn: 1,
+    moves: 0,
+    over: false
+  };
+
+  applyPreCuts(pre);
+  document.getElementById("mat").style.setProperty("--cell", cell + "px");
+  buildRulers();
+  render();
+  document.getElementById("winner").textContent = "";
+}
+
+function applyPreCuts(k) {
+  const maxCuts = state.cols * state.rows - 2;
+  k = Math.min(k, Math.max(0, maxCuts));
+  for (let n = 0; n < k; n++) {
+    const splittable = state.regions.filter(r => (r.c1 - r.c0) > 1 || (r.r1 - r.r0) > 1);
+    if (splittable.length === 0) break;
+    const reg = splittable[Math.floor(Math.random() * splittable.length)];
+    const w = reg.c1 - reg.c0, h = reg.r1 - reg.r0;
+    const options = [];
+    for (let i = 1; i < w; i++) options.push(["v", reg.c0 + i]);
+    for (let j = 1; j < h; j++) options.push(["h", reg.r0 + j]);
+    const [type, pos] = options[Math.floor(Math.random() * options.length)];
+    splitRegion(reg.id, type, pos);
+  }
+  state.moves = 0;
+}
+
+function splitRegion(id, type, pos) {
+  const idx = state.regions.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  const r = state.regions[idx];
+  let a, b;
+  if (type === "v") {
+    a = { id: state.nextId++, c0: r.c0, r0: r.r0, c1: pos, r1: r.r1 };
+    b = { id: state.nextId++, c0: pos, r0: r.r0, c1: r.c1, r1: r.r1 };
+  } else {
+    a = { id: state.nextId++, c0: r.c0, r0: r.r0, c1: r.c1, r1: pos };
+    b = { id: state.nextId++, c0: r.c0, r0: pos, c1: r.c1, r1: r.r1 };
+  }
+  state.regions.splice(idx, 1, a, b);
+}
+
+function doCut(id, type, pos) {
+  if (state.over) return;
+  splitRegion(id, type, pos);
+  state.moves++;
+
+  if (allUnits()) {
+    state.over = true;
+    render();
+    declareWinner(state.turn);
+    return;
+  }
+  state.turn = (state.turn === 1) ? 2 : 1;
+  render();
+}
+
+function allUnits() {
+  return state.regions.every(r => (r.c1 - r.c0) === 1 && (r.r1 - r.r0) === 1);
+}
+
+function render() {
+  const paper = document.getElementById("paper");
+  paper.style.width = (state.cols * cell) + "px";
+  paper.style.height = (state.rows * cell) + "px";
+  paper.innerHTML = "";
+
+  for (const reg of state.regions) {
+    const w = reg.c1 - reg.c0, h = reg.r1 - reg.r0;
+    const innerW = w * cell - 2 * GAP, innerH = h * cell - 2 * GAP;
+    const cw = innerW / w, ch = innerH / h;
+
+    const el = document.createElement("div");
+    el.className = "piece" + (w === 1 && h === 1 ? " unit" : "");
+    el.style.left = (reg.c0 * cell + GAP) + "px";
+    el.style.top = (reg.r0 * cell + GAP) + "px";
+    el.style.width = innerW + "px";
+    el.style.height = innerH + "px";
+    el.style.backgroundImage =
+      `repeating-linear-gradient(to right, var(--paper-line) 0 1px, transparent 1px ${cw}px),` +
+      `repeating-linear-gradient(to bottom, var(--paper-line) 0 1px, transparent 1px ${ch}px)`;
+
+    if (!state.over) {
+      for (let i = 1; i < w; i++) {
+        const hs = document.createElement("div");
+        hs.className = "hotspot v";
+        hs.style.left = (innerW * i / w) + "px";
+        hs.style.top = "0"; hs.style.height = innerH + "px";
+        const x = reg.c0 + i;
+        hs.addEventListener("click", e => { e.stopPropagation(); doCut(reg.id, "v", x); });
+        el.appendChild(hs);
+      }
+      for (let j = 1; j < h; j++) {
+        const hs = document.createElement("div");
+        hs.className = "hotspot h";
+        hs.style.top = (innerH * j / h) + "px";
+        hs.style.left = "0"; hs.style.width = innerW + "px";
+        const y = reg.r0 + j;
+        hs.addEventListener("click", e => { e.stopPropagation(); doCut(reg.id, "h", y); });
+        el.appendChild(hs);
+      }
+    }
+    paper.appendChild(el);
+  }
+
+  const badge = document.getElementById("turnBadge");
+  badge.className = "turn-badge p" + state.turn;
+  document.getElementById("turnText").textContent = "Player " + state.turn + " to cut";
+  document.getElementById("moveCount").textContent = state.moves;
+  document.getElementById("pieceCount").textContent = state.regions.length;
+  const total = state.cols * state.rows;
+  document.getElementById("progressBar").style.width =
+    Math.round(state.regions.length / total * 100) + "%";
+}
+
+function buildRulers() {
+  const top = document.getElementById("rulerTop");
+  const left = document.getElementById("rulerLeft");
+  top.innerHTML = ""; left.innerHTML = "";
+  top.style.width = (state.cols * cell) + "px";
+  left.style.height = (state.rows * cell) + "px";
+  for (let i = 0; i <= state.cols; i++) {
+    const n = document.createElement("span");
+    n.className = "num"; n.textContent = i; n.style.left = (i * cell) + "px";
+    top.appendChild(n);
+  }
+  for (let j = 0; j <= state.rows; j++) {
+    const n = document.createElement("span");
+    n.className = "num"; n.textContent = j; n.style.top = (j * cell) + "px";
+    left.appendChild(n);
+  }
+}
+
+function declareWinner(player) {
+  const w = document.getElementById("winner");
+  const colour = player === 1 ? "var(--p1)" : "var(--p2)";
+  w.innerHTML = `<span style="color:${colour}">Player ${player} made the final cut — they win!</span>` +
+                `<button class="again" onclick="newGame()">Play again</button>`;
+}
+
+newGame();
+</script>
+</body>
+</html>
